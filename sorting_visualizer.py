@@ -4,11 +4,12 @@ import random
 import time
 import threading
 
-# bar colors - each state gets its own color so you can see what's happening
-BAR_COLOR       = "#4a90d9"   # blue  = normal/unsorted
-COMPARING_COLOR = "#ff6b6b"   # red   = currently being compared
-SORTED_COLOR    = "#6bcb77"   # green = in its final sorted position
-PIVOT_COLOR     = "#ffd93d"   # yellow = pivot element (quick sort only)
+# each state gets its own color so you can see what's happening
+
+BAR_COLOR       = "#4a90d9"   # normal/unsorted
+COMPARING_COLOR = "#ff6b6b"   # currently being compared
+SORTED_COLOR    = "#6bcb77"   # in its final sorted position
+PIVOT_COLOR     = "#ffd93d"   # pivot element (quick sort only)
 
 
 class SortingVisualizer:
@@ -22,7 +23,7 @@ class SortingVisualizer:
         # the list of numbers we're sorting
         self.array = []
 
-        # flags to track what the app is doing right now
+        # flags to track whether app is sorting or paused
         self.is_sorting = False
         self.is_paused  = False
 
@@ -30,26 +31,22 @@ class SortingVisualizer:
         # 0.05s = 50ms is the default (1x speed)
         self.speed = 0.05
 
-        # at high speeds, drawing every single step makes the canvas lag behind.
-        # draw_skip controls how many steps we skip between redraws.
-        # 0 = draw every step, 1 = draw every other step, 3 = draw every 4th, etc.
+        # at high speeds drawing every single step makes the canvas lag behind
+        # draw_skip controls how many steps we skip between redraws
         self.draw_skip    = 0
-        self.skip_counter = 0   # counts up to draw_skip, resets when we actually draw
+        self.skip_counter = 0   # counts up to draw_skip and resets when we draw
 
-        # we save the original unsorted array before each sort so the Compare
-        # feature can re-run the same data with a different algorithm
+        # we save the original unsorted array before each sort so we can compare
         self.original_array  = []
         self.last_run        = None   # dict holding results from the last finished sort
-        self.anim_start_time = 0.0    # wall-clock time recorded when animation started
+        self.anim_start_time = 0.0   
         self.comparing_mode  = False  # True when Compare button triggered the current sort
 
-        # canvas item IDs for the bars and their number labels.
-        # we create these once and just move/recolor them each frame instead of
-        # deleting and recreating everything - this prevents flickering
+        # canvas item IDs for the bars and their number labels
         self.bar_items  = []
         self.bar_labels = []
 
-        # threading.Event is used to pause the background sort thread.
+        # threading.Event is used to pause the background sort thread
         # calling pause_event.set()   lets the thread keep running
         # calling pause_event.clear() makes the thread block until set() is called again
         self.pause_event = threading.Event()
@@ -58,17 +55,14 @@ class SortingVisualizer:
         self.setup_ui()
         self.generate_array()
 
-    # -----------------------------------------------------------------------
-    # UI SETUP
-    # -----------------------------------------------------------------------
+# UI SETUP
 
     def setup_ui(self):
-        # reusable style dicts so I don't have to repeat bg/fg/font everywhere
+        # reusable style dicts
         lbl_style = {"bg": "#2a2a3e", "fg": "white", "font": ("Arial", 10)}
         btn_style = {"font": ("Arial", 10, "bold"), "relief": "flat",
                      "padx": 10, "pady": 4, "cursor": "hand2"}
 
-        # ---- top control bar ----
         control_frame = tk.Frame(self.root, bg="#2a2a3e", pady=6)
         control_frame.pack(fill=tk.X, padx=10, pady=5)
 
@@ -88,7 +82,7 @@ class SortingVisualizer:
         self.algo_menu.bind("<<ComboboxSelected>>", self.on_algorithm_change)
         col += 1
 
-        # array size slider (10 - 75 elements)
+        # array size slider 
         tk.Label(control_frame, text="Size:", **lbl_style).grid(row=0, column=col, padx=(4, 2))
         col += 1
         self.size_var = tk.IntVar(value=50)
@@ -100,7 +94,6 @@ class SortingVisualizer:
         col += 1
 
         # speed multiplier dropdown
-        # 1x = 50ms per step (default). higher = faster animation
         tk.Label(control_frame, text="Speed:", **lbl_style).grid(row=0, column=col, padx=(4, 2))
         col += 1
         self.speed_var = tk.StringVar(value="1x")
@@ -132,9 +125,7 @@ class SortingVisualizer:
                   **btn_style).grid(row=0, column=col, padx=3)
         col += 1
 
-        # Compare button - stays grayed out until a sort finishes.
-        # after a sort, pick a different algorithm and click this to run it
-        # on the same array and see a side-by-side stats comparison.
+        # Compare button stays grayed out until a sort finishes
         self.compare_btn = tk.Button(
             control_frame, text="Compare", command=self.start_compare,
             bg="#6bcb77", fg="#1e1e2e", state=tk.DISABLED, **btn_style
@@ -160,11 +151,10 @@ class SortingVisualizer:
                   command=self.load_custom_array, bg="#c678dd", fg="white",
                   **btn_style).grid(row=0, column=col, padx=3)
 
-        # ---- main area: canvas on the left, info panel on the right ----
         main_frame = tk.Frame(self.root, bg="#1e1e2e")
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
-        # the canvas is where the bars get drawn
+        # where the bars get drawn
         self.canvas = tk.Canvas(main_frame, bg="#12121f", highlightthickness=0)
         self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
@@ -181,23 +171,22 @@ class SortingVisualizer:
         )
         self.info_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        # ---- bottom stats bar ----
         stats_frame = tk.Frame(self.root, bg="#2a2a3e")
         stats_frame.pack(fill=tk.X, padx=10, pady=5)
 
-        # swap count (red)
+        # swap count
         self.swaps_label = tk.Label(stats_frame, text="Swaps: 0",
                                     bg="#2a2a3e", fg="#ff6b6b",
                                     font=("Arial", 12, "bold"))
         self.swaps_label.pack(side=tk.LEFT, padx=20)
 
-        # pure algorithm time - how fast the sort runs without any animation delays (green)
+        # pure algorithm time
         self.algo_time_label = tk.Label(stats_frame, text="Algo Time: --",
                                         bg="#2a2a3e", fg="#6bcb77",
                                         font=("Arial", 12, "bold"))
         self.algo_time_label.pack(side=tk.LEFT, padx=20)
 
-        # animation time - actual wall-clock time the animation took on screen (purple)
+        # animation time
         self.anim_time_label = tk.Label(stats_frame, text="Anim Time: --",
                                         bg="#2a2a3e", fg="#c678dd",
                                         font=("Arial", 12, "bold"))
@@ -210,15 +199,14 @@ class SortingVisualizer:
 
         self.update_info()
 
-    # -----------------------------------------------------------------------
-    # ALGORITHM INFO PANEL
-    # -----------------------------------------------------------------------
+   
+# ALGORITHM INFO PANEL
+
 
     def on_algorithm_change(self, event=None):
         self.update_info()
 
     def update_info(self):
-        # descriptions and complexity data for each algorithm
         info = {
             "Bubble Sort": {
                 "time":   "Best: O(n)   Average: O(n²)   Worst: O(n²)",
@@ -314,16 +302,15 @@ class SortingVisualizer:
             self.info_text.insert(tk.END, d['desc'])
             self.info_text.config(state=tk.DISABLED)
 
-    # -----------------------------------------------------------------------
-    # ARRAY MANAGEMENT
-    # -----------------------------------------------------------------------
+  
+# ARRAY MANAGEMENT
 
     def generate_array(self):
         if self.is_sorting:
             return  # don't interrupt a running sort
 
         size = self.size_var.get()
-        self.array = [random.randint(10, 400) for _ in range(size)]
+        self.array = [random.randint(10, 200) for _ in range(size)]
 
         # new array means old comparison data is no longer valid
         self.last_run = None
@@ -335,14 +322,11 @@ class SortingVisualizer:
         self.bar_labels = []
         self.canvas.delete("all")
 
-        # prime skip_counter so the very first draw_array call always renders.
-        # without this, high-speed settings can skip the first draw and leave
-        # a blank canvas after generating
+        # prime skip_counter so the very first draw_array call always renders
         self.skip_counter = self.draw_skip
         self.draw_array(self.array, [], [])
 
     def clear_placeholder(self, event):
-        # wipe the hint text when the user clicks into the input box
         if self.custom_entry.get().startswith("e.g."):
             self.custom_entry.delete(0, tk.END)
 
@@ -357,7 +341,7 @@ class SortingVisualizer:
             return
 
         try:
-            # parse comma-separated input; using float() first lets "3.7" become 3
+            # parse comma-separated input
             nums = [int(float(x.strip())) for x in raw.split(",") if x.strip()]
         except ValueError:
             messagebox.showerror("Bad Input",
@@ -383,14 +367,11 @@ class SortingVisualizer:
         self.draw_array(self.array, [], [])
         self.status_label.config(text=f"Status: Loaded {len(nums)} numbers")
 
-    # -----------------------------------------------------------------------
-    # SPEED AND STATS
-    # -----------------------------------------------------------------------
+# SPEED AND STATS
 
     def update_speed(self, event=None):
         # each entry maps to (sleep delay in seconds, frame skip level)
-        # at 2x and above the canvas can't keep up with every step, so we skip
-        # some frames to make the speed difference actually noticeable
+        # at 2x and above the canvas can't keep up with every step so we skip frames to make the speed difference noticeable
         speed_table = {
             "0.25x": (0.20,  0),
             "0.5x":  (0.10,  0),
@@ -421,19 +402,16 @@ class SortingVisualizer:
         # pick the right unit depending on how big the number is
         ms = seconds * 1000
         if ms < 1:
-            return f"{ms:.4f}ms"    # very fast - show 4 decimal places
+            return f"{ms:.4f}ms"    
         if seconds >= 1:
-            return f"{seconds:.3f}s"  # over a second
+            return f"{seconds:.3f}s"  
         return f"{ms:.2f}ms"
 
-    # -----------------------------------------------------------------------
-    # DRAWING
-    # -----------------------------------------------------------------------
+    
+# DRAWING
 
     def draw_array(self, arr, comparing=[], sorted_indices=[], pivot_index=None):
-        # frame skipping - at 2x+ we can't redraw fast enough to match the speed,
-        # so we only redraw every (draw_skip + 1) steps instead of every single one.
-        # the final "all green" frame is always drawn regardless (the len check handles that)
+        # frame skipping - at 2x+ we can't redraw fast enough to match the speed so we only redraw every nth steps
         if self.draw_skip > 0 and len(sorted_indices) < len(arr):
             self.skip_counter = (self.skip_counter + 1) % (self.draw_skip + 1)
             if self.skip_counter != 0:
@@ -453,12 +431,11 @@ class SortingVisualizer:
         bar_width = canvas_width / n
         max_val   = max(arr)
 
-        # using sets here because checking "x in set" is O(1) lookup,
-        # vs "x in list" which scans the whole list and is O(n)
+        # using sets here because checking "x in set" is O(1) lookup, vs "x in list" which scans the whole list and is O(n)
         comparing_set = set(comparing)
         sorted_set    = set(sorted_indices)
 
-        # if this is a fresh array (or different size), build new canvas objects
+        # if this is a fresh array build new canvas objects
         if len(self.bar_items) != n:
             self.canvas.delete("all")
             self.bar_items  = []
@@ -470,7 +447,7 @@ class SortingVisualizer:
                 self.bar_items.append(rect)
                 self.bar_labels.append(label)
 
-        # move and recolor each bar in place (no delete/recreate = no flicker)
+        # move and recolor each bar in place
         for i in range(n):
             val = arr[i]
 
@@ -492,7 +469,7 @@ class SortingVisualizer:
             self.canvas.coords(self.bar_items[i], x1, y1, x2, y2)
             self.canvas.itemconfig(self.bar_items[i], fill=color)
 
-            # show the value above the bar; shrink font when bars are narrow
+            # show the value above the bar and shrink font when bars are narrow
             cx        = x1 + bar_width / 2
             font_size = 9 if bar_width >= 28 else 7
             text_y    = max(y1 - 3, 10)
@@ -503,13 +480,12 @@ class SortingVisualizer:
         # tell tkinter to actually push the changes to screen right now
         self.root.update_idletasks()
 
-    # -----------------------------------------------------------------------
-    # SORTING CONTROL
-    # -----------------------------------------------------------------------
+
+# SORTING CONTROLS
 
     def check_paused(self):
-        # if the user hit Pause, wait here until they hit Resume.
-        # returns False if sorting was cancelled so the thread knows to stop.
+        # if the user hit pause wait until they hit resume
+        # returns False if sorting was cancelled so the thread knows to stop
         self.pause_event.wait()
         return self.is_sorting
 
@@ -539,9 +515,8 @@ class SortingVisualizer:
         algo = self.algorithm_var.get()
         arr  = self.array.copy()
 
-        # --- measure pure algorithm speed ---
-        # the animation adds sleep() calls that inflate the time, so we run
-        # a separate no-sleep version just to get an accurate timing number
+        # measure pure algorithm speed 
+        # the animation adds sleep() calls that inflate the time so we run a separate no-sleep version to get an accurate timing number
         timing_funcs = {
             "Bubble Sort":    self._time_bubble_sort,
             "Selection Sort": self._time_selection_sort,
@@ -555,9 +530,7 @@ class SortingVisualizer:
         timing_funcs[algo](timing_copy)
         pure_time = time.time() - t0
 
-        # --- run the animated version ---
-        # using single-item lists for counters because Python doesn't let a method
-        # directly modify a plain int variable from an outer scope
+        # run the animated version 
         comparisons = [0]
         swaps       = [0]
 
@@ -574,7 +547,7 @@ class SortingVisualizer:
         elif algo == "Heap Sort":
             self.heap_sort(arr, comparisons, swaps)
 
-        # only update the screen if the sort finished (wasn't cancelled by Reset)
+        # only update the screen if the sort finished and wasn't cancelled by reset
         if self.is_sorting:
             anim_time  = time.time() - self.anim_start_time
             self.array = arr
@@ -585,7 +558,7 @@ class SortingVisualizer:
             self.status_label.config(text="Status: Done!")
             self.is_sorting = False
 
-            # package up the results so Compare can use them
+            # package up the results so compare can use them
             run_result = {
                 "algo":      algo,
                 "swaps":     swaps[0],
@@ -595,11 +568,11 @@ class SortingVisualizer:
             }
 
             if self.comparing_mode and self.last_run is not None:
-                # this was a compare run - open the results popup
+                # this was a compare run so open the results popup
                 prev_run = self.last_run
                 self.last_run       = run_result
                 self.comparing_mode = False
-                # root.after runs on the main thread, which is required for new windows
+                # root.after runs on the main thread which is required for new windows
                 self.root.after(0, lambda a=prev_run, b=run_result: self.show_comparison_window(a, b))
             else:
                 self.last_run       = run_result
@@ -612,13 +585,13 @@ class SortingVisualizer:
             return
 
         if self.is_paused:
-            # resume - signal the sort thread to keep going
+            # resume signals the sort thread to keep going
             self.is_paused = False
             self.pause_event.set()
             self.pause_btn.config(text="Pause")
             self.status_label.config(text="Status: Sorting...")
         else:
-            # pause - the sort thread will block at the next check_paused() call
+            # pause signals the sort thread to block at the next check_paused() call
             self.is_paused = True
             self.pause_event.clear()
             self.pause_btn.config(text="Resume")
@@ -632,9 +605,8 @@ class SortingVisualizer:
         self.status_label.config(text="Status: Ready")
         self.generate_array()
 
-    # -----------------------------------------------------------------------
-    # COMPARE FEATURE
-    # -----------------------------------------------------------------------
+
+# COMPARE FEATURE
 
     def start_compare(self):
         if self.is_sorting or self.last_run is None:
@@ -651,7 +623,7 @@ class SortingVisualizer:
             )
             return
 
-        # restore the original unsorted array, then kick off the new sort
+        # restore the original unsorted array then kick off the new sort
         self.comparing_mode = True
         self.array      = self.original_array.copy()
         self.bar_items  = []
@@ -679,13 +651,12 @@ class SortingVisualizer:
                  font=("Arial", 11, "bold"), width=18, pady=8
                  ).grid(row=1, column=2, padx=6, sticky="ew")
 
-        # figure out which side wins a given stat (lower is better for all of these)
+        # figure out which side wins a given stat (lower is better)
         def winner(val_a, val_b):
             if val_a < val_b:   return "a"
             elif val_b < val_a: return "b"
             else:               return None  # tie
 
-        # each row: (label, value for A, value for B, which side won)
         rows = [
             ("Array Size",
                 str(run_a["size"]),
@@ -732,16 +703,13 @@ class SortingVisualizer:
                   relief="flat", padx=14, pady=5
                   ).grid(row=len(rows) + 2, column=0, columnspan=3, pady=16)
 
-    # -----------------------------------------------------------------------
-    # SORTING ALGORITHMS  (animated - include draw and sleep calls)
-    # -----------------------------------------------------------------------
+# SORTING ALGORITHMS  
 
     def bubble_sort(self, arr, comparisons, swaps):
         n = len(arr)
         for i in range(n):
             swapped = False
-            # after each full pass the largest unsorted element ends up at the back,
-            # so we shrink the range by 1 each time
+            # after each full pass the largest unsorted element ends up at the back so we shrink the range by 1 each time
             for j in range(0, n - i - 1):
                 if not self.check_paused():
                     return
@@ -757,7 +725,7 @@ class SortingVisualizer:
 
                 self.update_stats(comparisons[0], swaps[0], 0)
 
-            # if nothing swapped this pass, the array is already sorted
+            # if nothing swapped this pass the array is already sorted
             if not swapped:
                 break
 
@@ -787,7 +755,7 @@ class SortingVisualizer:
             sorted_indices.append(i)
 
     def insertion_sort(self, arr, comparisons, swaps):
-        # like sorting playing cards - pick one up and slide it left until it fits
+        # pick one up and slide it left until it fits
         for i in range(1, len(arr)):
             key   = arr[i]   # the element we're inserting
             j     = i - 1
@@ -842,7 +810,7 @@ class SortingVisualizer:
             else:
                 arr[k] = right_arr[j]
                 j += 1
-                swaps[0] += 1  # right-side element jumped ahead of left-side elements
+                swaps[0] += 1  # right side element jumped ahead of left side elements
 
             self.draw_array(arr, [k], [])
             time.sleep(self.speed)
@@ -896,18 +864,17 @@ class SortingVisualizer:
     def heap_sort(self, arr, comparisons, swaps):
         n = len(arr)
 
-        # phase 1: build a max-heap (parent is always bigger than its children)
+        # build a max-heap (parent is always bigger than its children)
         # start from the last non-leaf node and sift everything down
         for i in range(n // 2 - 1, -1, -1):
             self.heapify(arr, n, i, comparisons, swaps)
 
-        # phase 2: pull the max (root) off the heap and place it at the end,
-        # then fix the heap again - repeat until sorted
+        # pull the max off the heap and place it at the end then fix the heap again and repeat until sorted
         for i in range(n - 1, 0, -1):
             if not self.check_paused():
                 return
 
-            arr[0], arr[i] = arr[i], arr[0]  # root is the largest, send it to back
+            arr[0], arr[i] = arr[i], arr[0]  # root is the largest so send it to back
             swaps[0] += 1
 
             self.draw_array(arr, [0, i], list(range(i, n)))
@@ -916,8 +883,8 @@ class SortingVisualizer:
             self.heapify(arr, i, 0, comparisons, swaps)  # restore heap property
 
     def heapify(self, arr, n, i, comparisons, swaps):
-        # makes sure the subtree rooted at index i satisfies the max-heap property.
-        # if a child is bigger than the parent, swap them, then recurse down.
+        # makes sure the subtree rooted at index i satisfies the max heap property
+        # if a child is bigger than the parent swap them then recurse down
         largest = i
         left    = 2 * i + 1   # left child is at 2i+1 in a 0-indexed array
         right   = 2 * i + 2   # right child is at 2i+2
@@ -943,11 +910,10 @@ class SortingVisualizer:
 
             self.heapify(arr, n, largest, comparisons, swaps)
 
-    # -----------------------------------------------------------------------
-    # TIMING VERSIONS  (no animation - just raw speed measurement)
-    # -----------------------------------------------------------------------
-    # these are the same algorithms as above but with all draw_array() and
-    # time.sleep() calls removed so we can time the pure algorithm performance
+   
+   # TIMING VERSIONS  (raw speed measurements)
+
+    # same algorithms as above but with all calls removed so we can time the pure algorithm performance
 
     def _time_bubble_sort(self, arr):
         n = len(arr)
@@ -1029,8 +995,6 @@ class SortingVisualizer:
             arr[i], arr[largest] = arr[largest], arr[i]
             self._heapify_simple(arr, n, largest)
 
-
-# start the app
 if __name__ == "__main__":
     root = tk.Tk()
     app  = SortingVisualizer(root)
