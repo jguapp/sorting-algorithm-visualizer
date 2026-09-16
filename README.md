@@ -17,15 +17,6 @@ values, and trade elegant theory for very visible real-world behavior.
 
 </div>
 
----
-
-<div align="center">
-  <img src=".github/assets/product-preview.svg" alt="Sorting Algorithm Visualizer — six algorithms animated illustrated product preview" width="100%" />
-  <sub>Illustrated product preview based on implemented features.</sub>
-</div>
-
----
-
 ## What it is
 
 The Sorting Algorithm Visualizer renders an array as vertical bars and animates
