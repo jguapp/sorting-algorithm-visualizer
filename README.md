@@ -1,4 +1,8 @@
 <div align="center">
+  <img src=".github/assets/banner.svg" alt="Sorting Algorithm Visualizer — six algorithms animated" width="100%" />
+</div>
+
+<div align="center">
 
 # Sorting Algorithm Visualizer
 
@@ -11,6 +15,13 @@ values, and trade elegant theory for very visible real-world behavior.
 ![Tkinter](https://img.shields.io/badge/GUI-Tkinter-2C2D72?style=for-the-badge&logo=python&logoColor=white)
 ![Algorithms](https://img.shields.io/badge/Algorithms-6-8B5CF6?style=for-the-badge)
 
+</div>
+
+---
+
+<div align="center">
+  <img src=".github/assets/product-preview.svg" alt="Sorting Algorithm Visualizer — six algorithms animated illustrated product preview" width="100%" />
+  <sub>Illustrated product preview based on implemented features.</sub>
 </div>
 
 ---
